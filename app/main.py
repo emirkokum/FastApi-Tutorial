@@ -1,5 +1,9 @@
 from fastapi import FastAPI
-from routes import task
+from app.routes import task
+from app.database import engine, Base
+
+# Create the database tables
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 

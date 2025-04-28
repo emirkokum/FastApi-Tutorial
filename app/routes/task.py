@@ -1,26 +1,50 @@
-from fastapi import APIRouter, HTTPException
-from models.task import Task
+from fastapi import APIRouter, HTTPException, Depends
+from app.models.task import TaskDb
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+from fastapi import status
+from app.dependencies import get_db
+from app.schemas.task import TaskOut, TaskCreate
+
 
 router = APIRouter(
     prefix="/tasks", #this will be the prefix for all routes in this router
     tags=["Tasks"] #this will be title for swagger documentation
 )
 
-tasks = [
-    Task(id=1, title="Alışveriş Yap", description="Marketten ekmek ve süt al", done=False),
-    Task(id=2, title="Ödev Yap", description="Matematik ödevi", done=True),
-]
+@router.get("/",response_model=list[TaskOut])
+def list_tasks(db : Session = Depends(get_db)):
+    try:
+        tasks = db.query(TaskDb).all()
+        return tasks
+    except SQLAlchemyError as e:
+        # Database error handling
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="There is a problem with database."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected Error."
+        )
 
-@router.get("/",response_model=list[Task])
-def list_tasks():
-    return tasks
-
-
-@router.post("/", response_model=Task,status_code=201)
-def create_task(task: Task):
-    for t in tasks:
-        if t.id == task.id:
-            return HTTPException(status_code=400, detail="Task with this ID already exists")
-    tasks.append(task)
-    return task
-
+@router.post("/", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
+def create_task(task:TaskCreate, db:Session = Depends(get_db)):
+    try:
+        db_task = TaskDb(**task.model_dump())
+        db.add(db_task)
+        db.commit()
+        db.refresh(db_task)
+        return db_task
+    except SQLAlchemyError as e:
+        db.rollback()  # Rollback the transaction in case of error
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="There is a problem with database."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected Error."
+        )
