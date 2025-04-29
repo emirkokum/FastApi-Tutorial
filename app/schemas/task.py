@@ -1,5 +1,6 @@
 # app/schemas/task.py
 
+from typing import Optional
 from pydantic import BaseModel
 
 class TaskCreate(BaseModel):
@@ -12,3 +13,8 @@ class TaskOut(TaskCreate):
 
     class Config:
         orm_mode = True
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    done: Optional[bool] = None
